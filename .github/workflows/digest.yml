@@ -1,0 +1,53 @@
+name: Daily AI digest
+
+on:
+  schedule:
+    # 05:30 UTC, Monday to Friday. That is 08:30 Athens in summer,
+    # 07:30 in winter. Runs can start up to 30 minutes late.
+    - cron: "30 5 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: "Window in hours (optional, overrides the state window)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: digest
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build digest
+        env:
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          HOURS: ${{ github.event.inputs.hours }}
+        run: |
+          node scripts/build.mjs --out=docs/archive ${HOURS:+--hours=$HOURS}
+
+      - name: Publish latest page
+        run: cp "docs/archive/ai-news-$(date -u +%F).html" docs/index.html
+
+      - name: Commit archive and state
+        run: |
+          git config user.name "digest-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs state.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "digest: $(date -u +%F)"
+            git push
+          fi
