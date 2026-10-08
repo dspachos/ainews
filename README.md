@@ -1,33 +1,46 @@
 # AI News Digest
 
-A daily AI news page, built with Node and published to GitHub Pages. It
-collects AI news from RSS feeds, Exa search, Hacker News, GitHub Trending,
-and Hugging Face papers, then renders one newspaper-style HTML page.
+[![Daily digest](https://github.com/dspachos/ainews/actions/workflows/digest.yml/badge.svg)](https://github.com/dspachos/ainews/actions/workflows/digest.yml)
+
+**Read today's edition: <https://dspachos.github.io/ainews/>**
+
+A daily AI newspaper, built with Node and published to GitHub Pages. Every
+working day it collects AI news from RSS feeds, Exa search, Hacker News,
+GitHub Trending, and Hugging Face papers, then renders one clean,
+newspaper-style page.
 
 The page has six sections: Models & Releases, AI Tools & Agents, GitHub
 Trending, Companies & Business, Research & Papers, and More AI News. Every
-item links to its original source.
+item links to its original source. Each edition stays online in the
+[archive](https://github.com/dspachos/ainews/tree/main/docs/archive).
 
-## Setup
+## How it works
 
-1. Create the GitHub repository and push this repo to it.
-2. Add the repository secret `EXA_API_KEY` (Settings, Secrets and variables,
-   Actions). Without it the build still runs, but Exa stories are missing.
-3. Enable Pages: Settings, Pages, Source "Deploy from a branch", branch
-   `main`, folder `/docs`. The site is then at
-   `https://<user>.github.io/<repo>/`.
+1. A scheduled GitHub Actions workflow runs on working days at 05:30 UTC.
+2. `scripts/build.mjs` fetches news published since the last run, deduplicates
+   and classifies it, and renders one self-contained HTML page.
+3. The workflow stores the dated page under `docs/archive/`, copies it to
+   `docs/index.html`, and commits everything back to `main`.
+4. GitHub Pages publishes the `docs/` folder of the `main` branch.
 
-## How it runs
+`state.json` at the repository root stores the last run time and the items
+already shown. The next run fetches only news from the last run to now, so a
+missed day extends the window automatically. The window is capped at 7 days,
+and no story appears twice across editions.
 
-A scheduled workflow (`.github/workflows/digest.yml`) runs on working days
-at 05:30 UTC. It builds the page, keeps the dated file under `docs/archive/`,
-copies it to `docs/index.html`, and commits everything back. Pages serves
-the committed files, so every run stays in the repository as an archive.
+## Sources
 
-The build reads `state.json` at the repository root. It stores the last run
-time and the items already shown. The next run fetches news from the last
-run to now, so a missed day extends the window automatically. The window is
-capped at 7 days.
+| Type | Sources |
+| --- | --- |
+| RSS feeds | TechCrunch, The Verge, Ars Technica, Wired, MIT Technology Review, OpenAI, Google DeepMind, Hugging Face blog, The Decoder, MarkTechPost, ZDNet, SiliconANGLE, Dataconomy, practitioner blogs |
+| Tool release feeds | Claude Code, Codex, OpenCode, Aider, Cline (GitHub releases), GitHub Blog, GitHub Changelog, JetBrains |
+| Exa search | Pre-defined queries for model releases, funding, deals, regulation, research, and tools |
+| Hacker News | Algolia searches with a minimum score |
+| GitHub Trending | Daily and weekly, filtered by AI keywords |
+| Papers | Hugging Face daily papers |
+
+Edit `scripts/sources.mjs` to add or remove any of these. No other file
+needs changes.
 
 ## Local run
 
@@ -35,8 +48,6 @@ capped at 7 days.
 node scripts/build.mjs --out=docs/archive
 cp "docs/archive/ai-news-$(date -u +%F).html" docs/index.html
 ```
-
-Options:
 
 | Option | Effect |
 | --- | --- |
@@ -46,13 +57,17 @@ Options:
 | `--out=DIR` | Write the HTML to another directory. |
 | `--max=N` | Cap the total story count (default 90). |
 
-## Sources
+## Setup
 
-Edit `scripts/sources.mjs` to add or remove feeds, queries, or classifier
-rules. No other file needs changes.
+This repository is already configured. For reference, the pieces are:
+
+- Repository secret `EXA_API_KEY` (Settings, Secrets and variables, Actions).
+  Without it the build still runs, but Exa stories are missing.
+- Pages enabled from the `main` branch, `/docs` folder.
+- The workflow needs `contents: write` to commit the daily page.
 
 ## Costs
 
-GitHub Actions and Pages are free for a public repository. Exa usage is
+GitHub Actions and Pages are free for this public repository. Exa usage is
 about 10 requests and 140 content pages per run, roughly $0.20 per run,
 which stays inside Exa's monthly free credits.
