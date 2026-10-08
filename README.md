@@ -65,9 +65,3 @@ This repository is already configured. For reference, the pieces are:
   Without it the build still runs, but Exa stories are missing.
 - Pages enabled from the `main` branch, `/docs` folder.
 - The workflow needs `contents: write` to commit the daily page.
-
-## Costs
-
-GitHub Actions and Pages are free for this public repository. Exa usage is
-about 10 requests and 140 content pages per run, roughly $0.20 per run,
-which stays inside Exa's monthly free credits.
