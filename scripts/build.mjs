@@ -37,6 +37,10 @@ function saveState(state) {
 }
 
 const now = new Date();
+// Minimum window per run: 24 h, or 72 h on Monday so one Monday edition covers
+// the whole weekend. Overlap with earlier editions is safe: the seen-items
+// filter drops what a previous edition already printed.
+const MIN_WINDOW_HOURS = now.getUTCDay() === 1 ? 72 : 24;
 const state = loadState();
 let windowStart;
 if (argValue('since')) {
@@ -44,8 +48,9 @@ if (argValue('since')) {
 } else if (argValue('hours')) {
   windowStart = new Date(now.getTime() - parseFloat(argValue('hours')) * 3600e3);
 } else if (state?.lastRun) {
+  const minStart = new Date(now.getTime() - MIN_WINDOW_HOURS * 3600e3);
   const capped = new Date(now.getTime() - MAX_WINDOW_HOURS * 3600e3);
-  windowStart = new Date(Math.max(new Date(state.lastRun).getTime(), capped.getTime()));
+  windowStart = new Date(Math.max(Math.min(new Date(state.lastRun).getTime(), minStart.getTime()), capped.getTime()));
 } else {
   windowStart = new Date(now.getTime() - 24 * 3600e3);
 }
