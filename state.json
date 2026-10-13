@@ -1,6 +1,6 @@
 {
-  "lastRun": "2026-10-13T07:42:34.639Z",
-  "runCount": 9,
+  "lastRun": "2026-10-13T07:54:46.860Z",
+  "runCount": 10,
   "seen": [
     "https://www.anthropic.com/claude-haiku-5-5",
     "https://openai.com/index/gpt-6-for-everyone",
@@ -837,7 +837,11 @@
     "opencode vscodev100 fixvscode launch the v2 cli without port 49084",
     "how anthropics dynamic workflows coordinate claude agents",
     "claude sent a false homicide tip to police and its part of a troubling",
-    "strengthening our defenses against distillation attacks"
+    "strengthening our defenses against distillation attacks",
+    "https://eu.36kr.com/en/p/4017114276368260",
+    "https://www.pehub.com/ardian-backed-hr-path-acquires-ai-governance-and-compliance-startup-snapai",
+    "fudan university teachers students led ai startup secures over 1 billi",
+    "ardianbacked hr path acquires ai governance and compliance startup sna"
   ],
   "lastOutput": "docs/archive/ai-news-2026-10-13.html"
 }
