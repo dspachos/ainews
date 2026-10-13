@@ -2,9 +2,11 @@ name: Daily AI digest
 
 on:
   schedule:
-    # 05:30 UTC, Monday to Friday. That is 08:30 Athens in summer,
-    # 07:30 in winter. Runs can start up to 30 minutes late.
-    - cron: "30 5 * * 1-5"
+    # 05:37 UTC daily. That is 08:37 Athens in summer, 07:37 in winter.
+    # Off the round :30 minute because GitHub delays or drops scheduled runs
+    # during congested minutes. A dropped run is not lost: the next run
+    # covers the gap (state window, capped at 7 days, seen-items dedupe).
+    - cron: "37 5 * * *"
   workflow_dispatch:
     inputs:
       hours:

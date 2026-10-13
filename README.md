@@ -5,7 +5,7 @@
 **Read today's edition: <https://dspachos.github.io/ainews/>**
 
 A daily AI newspaper, built with Node and published to GitHub Pages. Every
-working day it collects AI news from RSS feeds, Exa search, Hacker News,
+day it collects AI news from RSS feeds, Exa search, Hacker News,
 GitHub Trending, and Hugging Face papers, then renders one clean,
 newspaper-style page.
 
@@ -16,7 +16,7 @@ item links to its original source. Each edition stays online in the
 
 ## How it works
 
-1. A scheduled GitHub Actions workflow runs on working days at 05:30 UTC.
+1. A scheduled GitHub Actions workflow runs daily at 05:37 UTC.
 2. `scripts/build.mjs` fetches news published since the last run, deduplicates
    and classifies it, and renders one self-contained HTML page.
 3. The workflow stores the dated page under `docs/archive/`, copies it to
