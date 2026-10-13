@@ -370,7 +370,17 @@ items = deduped;
 const NON_LATIN_RE = /[\u0400-\u04FF\u0600-\u06FF\u0590-\u05FF\u0E00-\u0E7F\u0900-\u097F\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]/g;
 const LETTER_RE = /[a-zA-Z\u00C0-\u024F\u0400-\u04FF\u0600-\u06FF\u0590-\u05FF\u0E00-\u0E7F\u0900-\u097F\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]/g;
 const ENGLISH_FUNCTION_WORDS = /\b(the|and|with|for|from|that|this|will|has|have|are|was|were|its|their|they|which|than|into|after|before|not|but|you|your|new|how|what|when|where|why|who|says|said|using|used|gets|make|now|also|over|out|about|ship|ships|launch|launches|release|releases|released|announce|announces|announced)\b/i;
-function isEnglish(text) {
+// Some non-English outlets pass the text filter with machine-translated
+// English titles, so block their hosts outright as well.
+const NON_ENGLISH_TLDS = new Set(['cn', 'jp', 'kr', 'tw', 'hk', 'ru', 'vn', 'th', 'tr', 'ua']);
+const NON_ENGLISH_HOSTS = ['36kr.com', 'upplan.sg'];
+function isEnglishHost(url) {
+  let host;
+  try { host = new URL(url).hostname.replace(/^www\./, ''); } catch { return false; }
+  if (NON_ENGLISH_HOSTS.some((d) => host === d || host.endsWith('.' + d))) return false;
+  return !NON_ENGLISH_TLDS.has(host.split('.').pop());
+}
+function isEnglishText(text) {
   const letters = text.match(LETTER_RE) || [];
   const nonLatin = text.match(NON_LATIN_RE) || [];
   if (letters.length >= 6 && nonLatin.length / letters.length > 0.15) return false;
@@ -378,8 +388,11 @@ function isEnglish(text) {
   if (words.length >= 10 && !ENGLISH_FUNCTION_WORDS.test(text)) return false;
   return true;
 }
+function passesEnglishFilters(item) {
+  return isEnglishHost(item.url) && isEnglishText(`${item.title} ${item.summary || ''}`);
+}
 const beforeLangFilter = items.length;
-items = items.filter((i) => isEnglish(`${i.title} ${i.summary || ''}`));
+items = items.filter(passesEnglishFilters);
 if (beforeLangFilter !== items.length) console.log(`Dropped ${beforeLangFilter - items.length} non-English item(s)`);
 
 // drop items seen on a previous run. Items already in today's edition are
@@ -394,7 +407,7 @@ function loadTodayItems(dayKey) {
     return m ? (JSON.parse(m[1]).items || []) : [];
   } catch { return []; }
 }
-const existingToday = loadTodayItems(now.toISOString().slice(0, 10));
+const existingToday = loadTodayItems(now.toISOString().slice(0, 10)).filter(passesEnglishFilters);
 const todayKeys = new Set();
 for (const it of existingToday) {
   todayKeys.add(normUrl(it.url));
