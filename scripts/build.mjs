@@ -362,6 +362,26 @@ for (const it of items) {
 }
 items = deduped;
 
+// English-only output: Exa returns results in any language. Drop items whose
+// text is mostly a non-Latin script (Chinese, Japanese, Korean, Russian,
+// Arabic, and similar), or long Latin text without any English function word
+// (Spanish, Indonesian, and similar). Short strings pass: release titles
+// like "claude-code 2.1.296" carry no function words.
+const NON_LATIN_RE = /[\u0400-\u04FF\u0600-\u06FF\u0590-\u05FF\u0E00-\u0E7F\u0900-\u097F\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]/g;
+const LETTER_RE = /[a-zA-Z\u00C0-\u024F\u0400-\u04FF\u0600-\u06FF\u0590-\u05FF\u0E00-\u0E7F\u0900-\u097F\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]/g;
+const ENGLISH_FUNCTION_WORDS = /\b(the|and|with|for|from|that|this|will|has|have|are|was|were|its|their|they|which|than|into|after|before|not|but|you|your|new|how|what|when|where|why|who|says|said|using|used|gets|make|now|also|over|out|about|ship|ships|launch|launches|release|releases|released|announce|announces|announced)\b/i;
+function isEnglish(text) {
+  const letters = text.match(LETTER_RE) || [];
+  const nonLatin = text.match(NON_LATIN_RE) || [];
+  if (letters.length >= 6 && nonLatin.length / letters.length > 0.15) return false;
+  const words = text.toLowerCase().split(/[^a-z0-9']+/).filter(Boolean);
+  if (words.length >= 10 && !ENGLISH_FUNCTION_WORDS.test(text)) return false;
+  return true;
+}
+const beforeLangFilter = items.length;
+items = items.filter((i) => isEnglish(`${i.title} ${i.summary || ''}`));
+if (beforeLangFilter !== items.length) console.log(`Dropped ${beforeLangFilter - items.length} non-English item(s)`);
+
 // drop items seen on a previous run
 const seen = new Set(state?.seen || []);
 items = items.filter((i) => !seen.has(normUrl(i.url)) && !seen.has(titleKey(i.title)));

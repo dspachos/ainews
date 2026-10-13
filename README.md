@@ -19,8 +19,9 @@ item links to its original source. Each edition stays online in the
 1. A scheduled GitHub Actions workflow runs at 05:37 UTC, Monday to Friday.
    Every run scans at least the past 24 hours; the Monday edition scans 72
    hours, so the weekend is fully covered.
-2. `scripts/build.mjs` fetches news published since the last run, deduplicates
-   and classifies it, and renders one self-contained HTML page.
+2. `scripts/build.mjs` fetches news published since the last run, filters out
+   non-English results, deduplicates and classifies the rest, and renders one
+   self-contained HTML page.
 3. The workflow stores the dated page under `docs/archive/`, copies it to
    `docs/index.html`, and commits everything back to `main`.
 4. GitHub Pages publishes the `docs/` folder of the `main` branch.
