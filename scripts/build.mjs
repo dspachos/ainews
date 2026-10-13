@@ -405,6 +405,12 @@ if (leadCandidate) {
   items.unshift(leadCandidate);
 }
 
+if (items.length === 0) {
+  // An empty run must not overwrite a same-day edition with a thinner page.
+  console.log('No new items; keeping any existing edition and leaving state unchanged.');
+  process.exit(0);
+}
+
 // render
 const dateStr = now.toISOString().slice(0, 10);
 const payload = {
