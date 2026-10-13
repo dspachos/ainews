@@ -382,9 +382,30 @@ const beforeLangFilter = items.length;
 items = items.filter((i) => isEnglish(`${i.title} ${i.summary || ''}`));
 if (beforeLangFilter !== items.length) console.log(`Dropped ${beforeLangFilter - items.length} non-English item(s)`);
 
-// drop items seen on a previous run
-const seen = new Set(state?.seen || []);
-items = items.filter((i) => !seen.has(normUrl(i.url)) && !seen.has(titleKey(i.title)));
+// drop items seen on a previous run. Items already in today's edition are
+// exempt: a same-day rerun must rebuild the full day, not overwrite it with
+// only the delta since the earlier run.
+function loadTodayItems(dayKey) {
+  const p = path.join(OUT_DIR, `ai-news-${dayKey}.html`);
+  if (!fs.existsSync(p)) return [];
+  try {
+    const html = fs.readFileSync(p, 'utf8');
+    const m = html.match(/id="news-data">([\s\S]*?)<\/script>/);
+    return m ? (JSON.parse(m[1]).items || []) : [];
+  } catch { return []; }
+}
+const existingToday = loadTodayItems(now.toISOString().slice(0, 10));
+const todayKeys = new Set();
+for (const it of existingToday) {
+  todayKeys.add(normUrl(it.url));
+  const tk = titleKey(it.title);
+  if (tk) todayKeys.add(tk);
+}
+const seen = new Set((state?.seen || []).filter((k) => !todayKeys.has(k)));
+const fresh = items.filter((i) =>
+  !todayKeys.has(normUrl(i.url)) && !todayKeys.has(titleKey(i.title)) &&
+  !seen.has(normUrl(i.url)) && !seen.has(titleKey(i.title)));
+items = [...existingToday, ...fresh];
 items.sort((a, b) => b.score - a.score);
 
 // cap per category, then total
