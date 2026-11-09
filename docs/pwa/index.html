@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>AI News Digest</title>
+  <meta name="description" content="The daily AI newspaper as an app. Models and releases, tools and agents, GitHub trending, business, research, and more.">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafaf9">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c0a09">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="AI News">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./styles.css">
+  <script>
+    /* set the theme before first paint; app.js owns it after boot */
+    try {
+      var t = localStorage.getItem('ainews.theme');
+      var dark = t === '"dark"' || (t !== '"light"' && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    } catch (e) {
+      document.documentElement.dataset.theme = 'light';
+    }
+  </script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <div id="offline" class="offline-banner" hidden>Offline — showing cached briefings</div>
+
+  <header id="appHeader" class="app-header">
+    <div class="header-inner">
+      <a class="header-brand" href="#/today">AI News Digest</a>
+      <span id="headerTitle" class="header-title"></span>
+      <span id="headerActions" class="header-actions"></span>
+    </div>
+  </header>
+
+  <nav id="sidebar" class="sidebar" aria-label="App"></nav>
+
+  <main id="view" class="view" aria-live="polite"></main>
+
+  <nav id="tabbar" class="tabbar" aria-label="App"></nav>
+</body>
+</html>
