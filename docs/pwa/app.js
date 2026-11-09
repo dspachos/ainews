@@ -314,6 +314,108 @@ function editionsScreen(r) {
     </nav>`;
 }
 
+/* ---------- screens: search ---------- */
+
+function searchScreen() {
+  return `
+    <header class="screen-head">
+      <p class="date-line">All indexed editions</p>
+      <h1 class="large-title">Search</h1>
+    </header>
+    <div class="search-wrap">
+      <input id="searchInput" class="search-input" type="search"
+        placeholder="Search stories, sources, sections…" autocomplete="off" enterkeyhint="search">
+    </div>
+    <div id="searchResults"></div>`;
+}
+
+function searchResultsHTML(q) {
+  const trimmed = q.trim();
+  if (trimmed.length < 2) {
+    return '<p class="muted-note">Type at least two letters to search every indexed edition.</p>';
+  }
+  const needle = trimmed.toLowerCase();
+  const hits = state.items.filter((it) =>
+    `${it.title} ${it.summary || ''} ${it.source || ''} ${CATS[it.category] || ''}`
+      .toLowerCase()
+      .includes(needle),
+  );
+  if (!hits.length) {
+    return `<p class="muted-note">No stories match \u201c${esc(trimmed)}\u201d.</p>`;
+  }
+  const capped = hits.slice(0, MAX_SEARCH_RESULTS);
+  const rows = capped
+    .map(
+      (it) => `
+      <a class="row" href="#/story/${it.date}/${it.idx}">
+        <span class="row-main">
+          <span class="kicker">${esc(CATS[it.category] || 'More AI News')} · ${esc(fmtShort(it.date))}</span>
+          <span class="headline">${esc(it.title)}</span>
+        </span>
+        <span class="meta">${esc(srcName(it))}</span>
+      </a>`,
+    )
+    .join('');
+  const count = hits.length === capped.length
+    ? `${hits.length} ${hits.length === 1 ? 'story' : 'stories'}`
+    : `first ${capped.length} of ${hits.length} stories`;
+  return `<p class="results-count">${count} · newest first</p>
+    <div class="rows">${rows}</div>`;
+}
+
+/* ---------- screens: saved ---------- */
+
+function isSaved(url) {
+  return state.saved.some((s) => s.url === url);
+}
+
+function toggleSave(it) {
+  if (isSaved(it.url)) {
+    state.saved = state.saved.filter((s) => s.url !== it.url);
+  } else {
+    state.saved.unshift({
+      date: it.date,
+      url: it.url,
+      category: it.category,
+      title: it.title,
+      summary: it.summary || '',
+      source: it.source || '',
+      hnUrl: it.hnUrl || '',
+      metaNote: it.metaNote || '',
+    });
+  }
+  store('ainews.saved', state.saved);
+}
+
+function savedScreen() {
+  const head = `
+    <header class="screen-head">
+      <p class="date-line">Your list</p>
+      <h1 class="large-title">Saved</h1>
+    </header>`;
+  if (!state.saved.length) {
+    return `${head}
+    <div class="placeholder">
+      <p>No saved stories yet.</p>
+      <p>Open a story, then tap Save.</p>
+      <p><a class="btn" href="#/today">Go to Today</a></p>
+    </div>`;
+  }
+  const rows = state.saved
+    .map(
+      (it) => `
+      <div class="row">
+        <a class="row-main" href="${esc(it.url)}" target="_blank" rel="noopener">
+          <span class="kicker">${esc(CATS[it.category] || 'More AI News')} · ${esc(fmtShort(it.date))}</span>
+          <span class="headline">${esc(it.title)}</span>
+        </a>
+        <button class="unsave" data-action="unsave" data-url="${esc(it.url)}" aria-label="Remove from saved">\u2715</button>
+      </div>`,
+    )
+    .join('');
+  return `${head}<div class="rows">${rows}</div>`;
+}
+
 /* ---------- screens (placeholder until the next build steps) ---------- */
 
 function placeholder(title) {
@@ -325,11 +427,36 @@ const screens = {
   editions: editionsScreen,
   edition: editionScreen,
   story: async () => placeholder('Story'),
-  search: async () => placeholder('Search'),
-  saved: async () => placeholder('Saved'),
+  search: searchScreen,
+  saved: savedScreen,
 };
 
-const afterRender = {};
+const afterRender = {
+  search(r, view) {
+    const input = view.querySelector('#searchInput');
+    const box = view.querySelector('#searchResults');
+    box.innerHTML =
+      '<p class="muted-note">Type at least two letters to search every indexed edition.</p>';
+    let timer;
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        box.innerHTML = searchResultsHTML(input.value);
+      }, 120);
+    });
+    if (window.matchMedia('(pointer: fine)').matches) input.focus();
+  },
+  saved(r, view) {
+    view.querySelectorAll('[data-action="unsave"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const url = btn.dataset.url;
+        state.saved = state.saved.filter((s) => s.url !== url);
+        store('ainews.saved', state.saved);
+        render();
+      });
+    });
+  },
+};
 
 /* ---------- render loop ---------- */
 
