@@ -4,6 +4,10 @@
 
 **Read today's edition: <https://dspachos.github.io/ainews/>**
 
+**Install the app: <https://dspachos.github.io/ainews/pwa/>** — an Apple News-style
+PWA with Today, Editions, Search, and Saved screens. It works offline after
+the first visit.
+
 A daily AI newspaper, built with Node and published to GitHub Pages. Every
 weekday it collects AI news from RSS feeds, Exa search, Hacker News,
 GitHub Trending, and Hugging Face papers, then renders one clean,
@@ -23,7 +27,8 @@ item links to its original source. Each edition stays online in the
    non-English results, deduplicates and classifies the rest, and renders one
    self-contained HTML page.
 3. The workflow stores the dated page under `docs/archive/`, copies it to
-   `docs/index.html`, and commits everything back to `main`.
+   `docs/index.html`, rebuilds `docs/data.json` (the app's data index, last
+   20 editions), and commits everything back to `main`.
 4. GitHub Pages publishes the `docs/` folder of the `main` branch.
 
 `state.json` at the repository root stores the last run time and the items
@@ -59,6 +64,19 @@ cp "docs/archive/ai-news-$(date -u +%F).html" docs/index.html
 | `--no-state-update` | Do not change `state.json`. |
 | `--out=DIR` | Write the HTML to another directory. |
 | `--max=N` | Cap the total story count (default 90). |
+
+## The app
+
+`docs/pwa/` holds a no-build PWA (plain HTML/CSS/JS, hash routing). It reads
+`docs/data.json`, built by `scripts/build-index.mjs` from the `#news-data`
+payloads embedded in the archive pages. `data.json` is generated, never
+hand-edited. The service worker scopes to `/ainews/pwa/` only; bump `VERSION`
+in `docs/pwa/sw.js` whenever a shell file changes, or users keep the old
+cached shell. Icons regenerate with `python3 scripts/make_pwa_icons.py`
+(needs Pillow).
+
+Local preview: `python3 -m http.server 8080` from the repo root, then open
+`http://localhost:8080/docs/pwa/`.
 
 ## Setup
 
