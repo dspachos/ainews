@@ -166,6 +166,154 @@ function bindViewActions(root) {
   root.querySelector('[data-action="retry"]')?.addEventListener('click', () => render());
 }
 
+/* ---------- screens: shared pieces ---------- */
+
+function groupsOf(items) {
+  const groups = new Map();
+  for (const cat of CAT_ORDER) {
+    const list = items.filter((it) => it.category === cat);
+    if (list.length) groups.set(cat, list);
+  }
+  const known = new Set(CAT_ORDER);
+  const rest = items.filter((it) => !known.has(it.category));
+  if (rest.length) groups.set('general', [...(groups.get('general') || []), ...rest]);
+  return groups;
+}
+
+function groupHTML(cat, inner) {
+  return `<section class="group"><h2 class="group-title">${esc(CATS[cat] || 'More')}</h2>${inner}</section>`;
+}
+
+function metaText(it) {
+  return esc(srcName(it)) + (it.metaNote ? ` · ${esc(it.metaNote)}` : '');
+}
+
+function storyCard(it, date, idx, variant = '') {
+  return `
+    <a class="card story-card ${variant}" href="#/story/${date}/${idx}">
+      <span class="kicker">${esc(CATS[it.category] || 'More AI News')}</span>
+      <span class="headline">${esc(it.title)}</span>
+      ${it.summary ? `<span class="dek">${esc(it.summary)}</span>` : ''}
+      <span class="meta">${metaText(it)}</span>
+    </a>`;
+}
+
+function storyRow(it, date, idx) {
+  return `
+    <a class="row" href="#/story/${date}/${idx}">
+      <span class="row-main">
+        <span class="headline">${esc(it.title)}</span>
+        ${it.summary ? `<span class="dek">${esc(it.summary)}</span>` : ''}
+      </span>
+      <span class="meta">${esc(srcName(it))}</span>
+    </a>`;
+}
+
+function notFoundHTML(msg) {
+  return `<div class="placeholder"><h1 class="large-title">Not found</h1><p>${esc(msg)}</p><p><a class="btn" href="#/today">Go to Today</a></p></div>`;
+}
+
+/* ---------- screens: today ---------- */
+
+function todayScreen() {
+  const e = state.editions[0];
+  if (!e) throw new Error('data.json contains no editions');
+  const lead = e.lead || e.items[0];
+  const rest = e.items.filter((it) => it !== lead);
+  const idxOf = (it) => e.items.indexOf(it);
+
+  let body = '';
+  let first = true;
+  for (const [cat, list] of groupsOf(rest)) {
+    if (first) {
+      first = false;
+      const cards = list.slice(0, 6).map((it) => storyCard(it, e.date, idxOf(it))).join('');
+      const more = list.slice(6).map((it) => storyRow(it, e.date, idxOf(it))).join('');
+      body += groupHTML(
+        cat,
+        `<div class="card-grid">${cards}</div>` +
+          (more ? `<div class="rows group-rows">${more}</div>` : ''),
+      );
+    } else {
+      const rows = list.map((it) => storyRow(it, e.date, idxOf(it))).join('');
+      body += groupHTML(cat, `<div class="rows">${rows}</div>`);
+    }
+  }
+
+  return `
+    <header class="screen-head">
+      <p class="date-line">${esc(fmtLong(e.date))}</p>
+      <h1 class="large-title">Today</h1>
+    </header>
+    ${storyCard(lead, e.date, idxOf(lead), 'hero')}
+    ${body}`;
+}
+
+/* ---------- screens: edition ---------- */
+
+function editionScreen(r) {
+  const e = state.byDate.get(r.date);
+  if (!e) return notFoundHTML('That edition does not exist.');
+  const body = [...groupsOf(e.items)]
+    .map(
+      ([cat, list]) =>
+        groupHTML(
+          cat,
+          `<div class="rows">${list
+            .map((it) => storyRow(it, e.date, e.items.indexOf(it)))
+            .join('')}</div>`,
+        ),
+    )
+    .join('');
+  return `
+    <header class="screen-head">
+      <a class="back" href="#/editions">\u2190 Editions</a>
+      <p class="date-line">${esc(fmtLong(e.date))}</p>
+      <h1 class="large-title">AI News Digest</h1>
+      <p class="screen-summary">${e.items.length} stories · led by ${esc(srcName(e.lead || e.items[0]))}</p>
+    </header>
+    ${body}
+    <p class="reader-foot"><a href="${esc(PATHS.edition(e.date))}">Open the web edition \u2197</a></p>`;
+}
+
+/* ---------- screens: editions list ---------- */
+
+function editionsScreen(r) {
+  const maxPage = Math.max(1, Math.ceil(state.editions.length / PER_PAGE));
+  const page = Math.min(Math.max(1, r.page || 1), maxPage);
+  const rows = state.editions
+    .slice((page - 1) * PER_PAGE, page * PER_PAGE)
+    .map(
+      (e) => `
+      <a class="row edition-row" href="#/edition/${e.date}">
+        <span class="row-main">
+          <span class="kicker">${esc(fmtLong(e.date))}</span>
+          <span class="headline">${esc(e.lead ? e.lead.title : 'AI News Digest')}</span>
+          <span class="dek">${e.items.length} stories</span>
+        </span>
+        <span class="meta" aria-hidden="true">\u203a</span>
+      </a>`,
+    )
+    .join('');
+  const newer = page > 1
+    ? `<a class="btn ghost" href="#/editions/${page - 1}">\u2190 Newer</a>`
+    : '<span class="btn ghost" aria-hidden="true"></span>';
+  const older = page < maxPage
+    ? `<a class="btn ghost" href="#/editions/${page + 1}">Older \u2192</a>`
+    : '<span class="btn ghost" aria-hidden="true"></span>';
+  return `
+    <header class="screen-head">
+      <p class="date-line">Every edition</p>
+      <h1 class="large-title">Editions</h1>
+    </header>
+    <div class="rows">${rows}</div>
+    <nav class="archive-nav" aria-label="Edition pages">
+      ${newer}
+      <span class="archive-count">Page ${page} of ${maxPage}</span>
+      ${older}
+    </nav>`;
+}
+
 /* ---------- screens (placeholder until the next build steps) ---------- */
 
 function placeholder(title) {
@@ -173,9 +321,9 @@ function placeholder(title) {
 }
 
 const screens = {
-  today: async () => placeholder('Today'),
-  editions: async () => placeholder('Editions'),
-  edition: async () => placeholder('Edition'),
+  today: todayScreen,
+  editions: editionsScreen,
+  edition: editionScreen,
   story: async () => placeholder('Story'),
   search: async () => placeholder('Search'),
   saved: async () => placeholder('Saved'),
