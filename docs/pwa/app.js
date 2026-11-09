@@ -416,17 +416,36 @@ function savedScreen() {
   return `${head}<div class="rows">${rows}</div>`;
 }
 
-/* ---------- screens (placeholder until the next build steps) ---------- */
+/* ---------- screens: reader ---------- */
 
-function placeholder(title) {
-  return `<div class="placeholder"><h1 class="large-title">${esc(title)}</h1><p>Coming in the next build step.</p></div>`;
+function storyScreen(r) {
+  const e = state.byDate.get(r.date);
+  const it = e && e.items[r.idx];
+  if (!it) return notFoundHTML('That story does not exist.');
+  const saved = isSaved(it.url);
+  return `
+    <header class="screen-head">
+      <a class="back" href="#/edition/${r.date}">\u2190 Edition</a>
+      <p class="date-line">${esc(CATS[it.category] || 'More AI News')} · ${esc(fmtLong(r.date))}</p>
+      <h1 class="reader-title">${esc(it.title)}</h1>
+      <p class="reader-src">${esc(srcName(it))}${it.metaNote ? ` · ${esc(it.metaNote)}` : ''}</p>
+    </header>
+    ${it.summary ? `<div class="reader-body"><p>${esc(it.summary)}</p></div>` : ''}
+    <div class="reader-actions">
+      <button class="btn save-btn${saved ? ' saved' : ''}" data-action="toggle-save" aria-pressed="${saved}">${saved ? 'Saved \u2713' : 'Save'}</button>
+      <a class="btn ghost" href="${esc(it.url)}" target="_blank" rel="noopener">Continue on ${esc(srcName(it))} \u2197</a>
+      ${it.hnUrl ? `<a class="btn ghost" href="${esc(it.hnUrl)}" target="_blank" rel="noopener">HN discussion \u2197</a>` : ''}
+    </div>
+    <p class="reader-foot">
+      <a href="${esc(PATHS.edition(r.date) + '#' + (it.category || 'general'))}">Open this section in the web edition \u2197</a>
+    </p>`;
 }
 
 const screens = {
   today: todayScreen,
   editions: editionsScreen,
   edition: editionScreen,
-  story: async () => placeholder('Story'),
+  story: storyScreen,
   search: searchScreen,
   saved: savedScreen,
 };
@@ -454,6 +473,19 @@ const afterRender = {
         store('ainews.saved', state.saved);
         render();
       });
+    });
+  },
+  story(r, view) {
+    view.querySelector('[data-action="toggle-save"]')?.addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      const ed = state.byDate.get(r.date);
+      const it = ed && ed.items[r.idx];
+      if (!it) return;
+      toggleSave(it);
+      const saved = isSaved(it.url);
+      btn.classList.toggle('saved', saved);
+      btn.setAttribute('aria-pressed', String(saved));
+      btn.textContent = saved ? 'Saved \u2713' : 'Save';
     });
   },
 };
