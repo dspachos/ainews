@@ -13,6 +13,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { RSS_FEEDS, EXA_QUERIES, HN_QUERIES, GITHUB, AI_KEYWORDS, CATEGORY_KEYWORDS } from './sources.mjs';
 import { renderPage } from './render.mjs';
+import { buildIndex } from './build-index.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const STATE_PATH = path.join(SCRIPT_DIR, '..', 'state.json');
@@ -460,6 +461,9 @@ const html = renderPage(payload, dateStr);
 const outPath = path.join(OUT_DIR, `ai-news-${dateStr}.html`);
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(outPath, html);
+
+// keep the PWA data index in sync with the archive
+buildIndex();
 
 // update state only after a successful write
 if (!NO_STATE_UPDATE) {
