@@ -4,7 +4,7 @@
    digest site is never intercepted. Bump VERSION when shell files change;
    old caches are deleted on activate. */
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL_CACHE = `ainews-shell-${VERSION}`;
 const DATA_CACHE = `ainews-data-${VERSION}`;
 const KEEP = [SHELL_CACHE, DATA_CACHE];

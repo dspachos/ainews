@@ -99,6 +99,46 @@ function srcName(it) {
   }
 }
 
+function hostOf(it) {
+  if (it.sourceHost) return it.sourceHost;
+  try {
+    return new URL(it.url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+/* Same shape as the site's timeAgo: "2 min ago", "5h ago", "3 days ago". */
+function timeAgo(iso) {
+  if (!iso) return '';
+  let s = (Date.now() - new Date(iso).getTime()) / 1e3;
+  if (s < 0) s = 0;
+  if (s < 3600) return `${Math.max(1, Math.round(s / 60))} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  const d = Math.round(s / 86400);
+  return d === 1 ? '1 day ago' : `${d} days ago`;
+}
+
+function timeLabel(it) {
+  return it.badge || timeAgo(it.publishedAt) || fmtShort(it.date || '');
+}
+
+function faviconHTML(it) {
+  const host = hostOf(it);
+  if (!host) return '';
+  const src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
+  return `<img class="fav" src="${esc(src)}" alt="" width="14" height="14" loading="lazy" onerror="this.remove()">`;
+}
+
+function metaHTML(it) {
+  const t = timeLabel(it);
+  return (
+    faviconHTML(it) +
+    `<span class="src">${esc(srcName(it))}</span>` +
+    (t ? `<span class="sep" aria-hidden="true">\u00b7</span><span>${esc(t)}</span>` : '')
+  );
+}
+
 /* ---------- navigation ---------- */
 
 const ICONS = {
@@ -184,28 +224,26 @@ function groupHTML(cat, inner) {
   return `<section class="group"><h2 class="group-title">${esc(CATS[cat] || 'More')}</h2>${inner}</section>`;
 }
 
-function metaText(it) {
-  return esc(srcName(it)) + (it.metaNote ? ` · ${esc(it.metaNote)}` : '');
-}
-
 function storyCard(it, date, idx, variant = '') {
   return `
-    <a class="card story-card ${variant}" href="#/story/${date}/${idx}">
+    <a class="card story-card ${variant}" href="#/story/${date}/${idx}" data-story>
       <span class="kicker">${esc(CATS[it.category] || 'More AI News')}</span>
       <span class="headline">${esc(it.title)}</span>
       ${it.summary ? `<span class="dek">${esc(it.summary)}</span>` : ''}
-      <span class="meta">${metaText(it)}</span>
+      <span class="meta">${metaHTML(it)}</span>
     </a>`;
 }
 
-function storyRow(it, date, idx) {
+function storyRow(it, date, idx, withKicker = false) {
   return `
-    <a class="row" href="#/story/${date}/${idx}">
+    <a class="row" href="#/story/${date}/${idx}" data-story>
       <span class="row-main">
+        ${withKicker ? `<span class="kicker">${esc(CATS[it.category] || 'More AI News')}</span>` : ''}
         <span class="headline">${esc(it.title)}</span>
         ${it.summary ? `<span class="dek">${esc(it.summary)}</span>` : ''}
+        <span class="meta">${metaHTML(it)}</span>
       </span>
-      <span class="meta">${esc(srcName(it))}</span>
+      <span class="chevron" aria-hidden="true">\u203a</span>
     </a>`;
 }
 
@@ -218,8 +256,10 @@ function notFoundHTML(msg) {
 function todayScreen() {
   const e = state.editions[0];
   if (!e) throw new Error('data.json contains no editions');
-  const lead = e.lead || e.items[0];
-  const rest = e.items.filter((it) => it !== lead);
+  /* The lead is a JSON copy of items[0], so match it by url, not reference. */
+  const leadIdx = Math.max(0, e.items.findIndex((it) => it.url === (e.lead && e.lead.url)));
+  const lead = e.items[leadIdx];
+  const rest = e.items.filter((_, i) => i !== leadIdx);
   const idxOf = (it) => e.items.indexOf(it);
 
   let body = '';
@@ -291,7 +331,7 @@ function editionsScreen(r) {
           <span class="headline">${esc(e.lead ? e.lead.title : 'AI News Digest')}</span>
           <span class="dek">${e.items.length} stories</span>
         </span>
-        <span class="meta" aria-hidden="true">\u203a</span>
+        <span class="chevron" aria-hidden="true">\u203a</span>
       </a>`,
     )
     .join('');
@@ -344,18 +384,7 @@ function searchResultsHTML(q) {
     return `<p class="muted-note">No stories match \u201c${esc(trimmed)}\u201d.</p>`;
   }
   const capped = hits.slice(0, MAX_SEARCH_RESULTS);
-  const rows = capped
-    .map(
-      (it) => `
-      <a class="row" href="#/story/${it.date}/${it.idx}">
-        <span class="row-main">
-          <span class="kicker">${esc(CATS[it.category] || 'More AI News')} · ${esc(fmtShort(it.date))}</span>
-          <span class="headline">${esc(it.title)}</span>
-        </span>
-        <span class="meta">${esc(srcName(it))}</span>
-      </a>`,
-    )
-    .join('');
+  const rows = capped.map((it) => storyRow(it, it.date, it.idx, true)).join('');
   const count = hits.length === capped.length
     ? `${hits.length} ${hits.length === 1 ? 'story' : 'stories'}`
     : `first ${capped.length} of ${hits.length} stories`;
@@ -375,11 +404,15 @@ function toggleSave(it) {
   } else {
     state.saved.unshift({
       date: it.date,
+      idx: it.idx,
       url: it.url,
       category: it.category,
       title: it.title,
       summary: it.summary || '',
       source: it.source || '',
+      sourceHost: it.sourceHost || '',
+      publishedAt: it.publishedAt || '',
+      badge: it.badge || '',
       hnUrl: it.hnUrl || '',
       metaNote: it.metaNote || '',
     });
@@ -402,50 +435,142 @@ function savedScreen() {
     </div>`;
   }
   const rows = state.saved
-    .map(
-      (it) => `
+    .map((it) => {
+      const inEdition = it.idx != null && state.byDate.has(it.date);
+      const href = inEdition ? `#/story/${it.date}/${it.idx}` : it.url;
+      const attrs = inEdition ? 'data-story' : 'target="_blank" rel="noopener"';
+      return `
       <div class="row">
-        <a class="row-main" href="${esc(it.url)}" target="_blank" rel="noopener">
+        <a class="row-main" href="${esc(href)}" ${attrs}>
           <span class="kicker">${esc(CATS[it.category] || 'More AI News')} · ${esc(fmtShort(it.date))}</span>
           <span class="headline">${esc(it.title)}</span>
+          <span class="meta">${metaHTML(it)}</span>
         </a>
         <button class="unsave" data-action="unsave" data-url="${esc(it.url)}" aria-label="Remove from saved">\u2715</button>
-      </div>`,
-    )
+      </div>`;
+    })
     .join('');
   return `${head}<div class="rows">${rows}</div>`;
 }
 
-/* ---------- screens: reader ---------- */
+/* ---------- story modal ---------- */
 
-function storyScreen(r) {
-  const e = state.byDate.get(r.date);
-  const it = e && e.items[r.idx];
-  if (!it) return notFoundHTML('That story does not exist.');
+const X_ICON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+let modalEl = null;
+let modalReturnFocus = null;
+let modalViaHash = false;
+let underlyingKey = null;
+
+function storyModalHTML(it) {
   const saved = isSaved(it.url);
+  const cat = CATS[it.category] || 'More AI News';
+  const t = timeLabel(it);
   return `
-    <header class="screen-head">
-      <a class="back" href="#/edition/${r.date}">\u2190 Edition</a>
-      <p class="date-line">${esc(CATS[it.category] || 'More AI News')} · ${esc(fmtLong(r.date))}</p>
-      <h1 class="reader-title">${esc(it.title)}</h1>
-      <p class="reader-src">${esc(srcName(it))}${it.metaNote ? ` · ${esc(it.metaNote)}` : ''}</p>
-    </header>
-    ${it.summary ? `<div class="reader-body"><p>${esc(it.summary)}</p></div>` : ''}
-    <div class="reader-actions">
-      <button class="btn save-btn${saved ? ' saved' : ''}" data-action="toggle-save" aria-pressed="${saved}">${saved ? 'Saved \u2713' : 'Save'}</button>
-      <a class="btn ghost" href="${esc(it.url)}" target="_blank" rel="noopener">Continue on ${esc(srcName(it))} \u2197</a>
-      ${it.hnUrl ? `<a class="btn ghost" href="${esc(it.hnUrl)}" target="_blank" rel="noopener">HN discussion \u2197</a>` : ''}
-    </div>
-    <p class="reader-foot">
-      <a href="${esc(PATHS.edition(r.date) + '#' + (it.category || 'general'))}">Open this section in the web edition \u2197</a>
-    </p>`;
+    <div class="modal" role="document" aria-labelledby="modalTitle">
+      <button class="modal-close" aria-label="Close">${X_ICON}</button>
+      <div class="modal-grip" aria-hidden="true"></div>
+      <div class="modal-scroll">
+        <p class="modal-kicker">${esc(cat)}${t ? ` \u00b7 ${esc(t)}` : ''}</p>
+        <h2 class="modal-title" id="modalTitle">${esc(it.title)}</h2>
+        <p class="modal-src meta">${metaHTML(it)}</p>
+        ${it.summary ? `<div class="modal-summary"><p>${esc(it.summary)}</p></div>` : ''}
+        ${it.metaNote ? `<p class="modal-note">${esc(it.metaNote)}</p>` : ''}
+        <div class="modal-actions">
+          <a class="btn" href="${esc(it.url)}" target="_blank" rel="noopener">Continue on ${esc(srcName(it))} \u2197</a>
+          <button class="btn ghost save-btn${saved ? ' saved' : ''}" data-action="toggle-save" aria-pressed="${saved}">${saved ? 'Saved \u2713' : 'Save'}</button>
+          ${it.hnUrl ? `<a class="btn ghost" href="${esc(it.hnUrl)}" target="_blank" rel="noopener">HN discussion \u2197</a>` : ''}
+        </div>
+        ${it.date ? `<p class="modal-foot">From the ${esc(fmtLong(it.date))} edition \u00b7 <a href="${esc(PATHS.edition(it.date) + '#' + (it.category || 'general'))}">web edition \u2197</a></p>` : ''}
+      </div>
+    </div>`;
+}
+
+function presentModal(it, viaHash) {
+  dismissModal(true);
+  modalReturnFocus = document.activeElement;
+  modalEl = document.createElement('div');
+  modalEl.className = 'modal-backdrop';
+  modalEl.setAttribute('role', 'dialog');
+  modalEl.setAttribute('aria-modal', 'true');
+  modalEl.innerHTML = storyModalHTML(it);
+  modalEl.dataset.viaHash = viaHash ? '1' : '';
+  document.body.appendChild(modalEl);
+  document.documentElement.classList.add('modal-open');
+
+  modalEl.addEventListener('click', (e) => {
+    if (e.target === modalEl) closeStoryModal();
+  });
+  modalEl.querySelector('.modal-close').addEventListener('click', closeStoryModal);
+  modalEl.querySelector('[data-action="toggle-save"]')?.addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    toggleSave(it);
+    const saved = isSaved(it.url);
+    btn.classList.toggle('saved', saved);
+    btn.setAttribute('aria-pressed', String(saved));
+    btn.textContent = saved ? 'Saved \u2713' : 'Save';
+  });
+  modalEl._keyHandler = (e) => {
+    if (e.key === 'Escape') closeStoryModal();
+  };
+  document.addEventListener('keydown', modalEl._keyHandler);
+
+  requestAnimationFrame(() => requestAnimationFrame(() => modalEl.classList.add('show')));
+  modalEl.querySelector('.modal-close').focus({ preventScroll: true });
+}
+
+function dismissModal(instant = false) {
+  if (!modalEl) return;
+  const el = modalEl;
+  modalEl = null;
+  document.documentElement.classList.remove('modal-open');
+  document.removeEventListener('keydown', el._keyHandler);
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (instant || reduce) {
+    el.remove();
+  } else {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 260);
+  }
+  modalReturnFocus?.focus?.({ preventScroll: true });
+  modalReturnFocus = null;
+}
+
+/* Close via history when the story hash was pushed by a tap, so the
+   hardware back gesture works like in native apps. */
+function closeStoryModal() {
+  if (!modalEl) return;
+  if (modalEl.dataset.viaHash && location.hash.startsWith('#/story/')) {
+    history.back();
+  } else {
+    dismissModal();
+  }
+}
+
+/* Story links keep their #/story/... href so deep links and new-tab clicks
+   still work; taps open the modal over the current screen instead. */
+function wireStoryLinks() {
+  $('#view').addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-story]');
+    if (!a) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    const href = a.getAttribute('href');
+    if (location.hash === href) {
+      modalViaHash = false;
+      render();
+    } else {
+      modalViaHash = true;
+      location.hash = href;
+    }
+  });
 }
 
 const screens = {
   today: todayScreen,
   editions: editionsScreen,
   edition: editionScreen,
-  story: storyScreen,
   search: searchScreen,
   saved: savedScreen,
 };
@@ -475,24 +600,17 @@ const afterRender = {
       });
     });
   },
-  story(r, view) {
-    view.querySelector('[data-action="toggle-save"]')?.addEventListener('click', (e) => {
-      const btn = e.currentTarget;
-      const ed = state.byDate.get(r.date);
-      const it = ed && ed.items[r.idx];
-      if (!it) return;
-      toggleSave(it);
-      const saved = isSaved(it.url);
-      btn.classList.toggle('saved', saved);
-      btn.setAttribute('aria-pressed', String(saved));
-      btn.textContent = saved ? 'Saved \u2713' : 'Save';
-    });
-  },
 };
 
 /* ---------- render loop ---------- */
 
 let renderSeq = 0;
+
+function screenKey(r) {
+  if (r.screen === 'edition') return `edition:${r.date}`;
+  if (r.screen === 'editions') return `editions:${r.page}`;
+  return r.screen;
+}
 
 async function render() {
   const seq = ++renderSeq;
@@ -501,14 +619,58 @@ async function render() {
     el.classList.toggle('active', el.dataset.route === r.screen);
   });
   const view = $('#view');
+
+  if (r.screen === 'story') {
+    if (!underlyingKey) $('#headerTitle').textContent = 'Edition';
+    try {
+      await initData();
+      if (seq !== renderSeq) return;
+      const e = state.byDate.get(r.date);
+      const it = e && e.items[r.idx];
+      if (!it) {
+        dismissModal();
+        underlyingKey = null;
+        view.innerHTML = notFoundHTML('That story does not exist.');
+        bindViewActions(view);
+        window.scrollTo(0, 0);
+        return;
+      }
+      if (!underlyingKey) {
+        /* Deep link with no screen behind it: show the edition under the modal. */
+        const under = e ? { screen: 'edition', date: r.date } : { screen: 'today' };
+        view.innerHTML = '<div class="loading">Loading\u2026</div>';
+        view.innerHTML = await screens[under.screen](under);
+        if (afterRender[under.screen]) afterRender[under.screen](under, view);
+        bindViewActions(view);
+        underlyingKey = screenKey(under);
+      }
+      if (seq !== renderSeq) return;
+      presentModal({ ...it, date: r.date, idx: r.idx }, modalViaHash);
+      modalViaHash = false;
+    } catch (err) {
+      if (seq !== renderSeq) return;
+      underlyingKey = null;
+      dismissModal();
+      view.innerHTML = errorHTML(err);
+      bindViewActions(view);
+      window.scrollTo(0, 0);
+    }
+    return;
+  }
+
+  dismissModal();
+  const key = screenKey(r);
+  if (key === underlyingKey) return; /* same screen: keep DOM and scroll */
+  underlyingKey = null;
   $('#headerTitle').textContent = r.screen.charAt(0).toUpperCase() + r.screen.slice(1);
-  view.innerHTML = '<div class="loading">Loading…</div>';
+  view.innerHTML = '<div class="loading">Loading\u2026</div>';
   try {
     await initData();
     if (seq !== renderSeq) return;
     view.innerHTML = await screens[r.screen](r);
     if (afterRender[r.screen]) afterRender[r.screen](r, view);
     bindViewActions(view);
+    underlyingKey = key;
   } catch (err) {
     if (seq !== renderSeq) return;
     view.innerHTML = errorHTML(err);
@@ -578,6 +740,7 @@ function boot() {
   applyTheme();
   wireHeader();
   wireOffline();
+  wireStoryLinks();
   window.addEventListener('hashchange', render);
   render();
 }
