@@ -18,7 +18,18 @@ const OUT = path.join(SCRIPT_DIR, '..', 'docs', 'data.json');
 const MAX_EDITIONS = 20;
 const MAX_SUMMARY = 400;
 
-const ITEM_FIELDS = ['category', 'title', 'url', 'source', 'summary', 'hnUrl', 'metaNote'];
+const ITEM_FIELDS = [
+  'category',
+  'title',
+  'url',
+  'source',
+  'sourceHost',
+  'publishedAt',
+  'badge',
+  'summary',
+  'hnUrl',
+  'metaNote',
+];
 
 function payloadOf(file) {
   const html = fs.readFileSync(file, 'utf8');
