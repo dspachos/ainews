@@ -2,12 +2,16 @@ name: Daily AI digest
 
 on:
   schedule:
-    # 05:37 UTC, Monday to Friday. That is 08:37 Athens in summer, 07:30 in winter.
+    # 05:37 and 15:37 UTC, Monday to Friday. That is 08:37 and 18:37 Athens
+    # in summer (07:37 and 17:37 in winter). The morning run opens the day's
+    # edition; the afternoon run updates the same file with the new stories,
+    # because build.mjs merges same-day reruns into one edition.
     # No weekend runs; the Monday edition uses a 72-hour window so it covers
-    # the whole weekend. Off the round :30 minute because GitHub delays or
-    # drops scheduled runs during congested minutes. A dropped run is not
+    # the whole weekend. Off the round :00/:30 minutes because GitHub delays
+    # or drops scheduled runs during congested minutes. A dropped run is not
     # lost: the next run covers the gap (state window, capped at 7 days).
     - cron: "37 5 * * 1-5"
+    - cron: "37 15 * * 1-5"
   workflow_dispatch:
     inputs:
       hours:

@@ -20,9 +20,11 @@ item links to its original source. Each edition stays online in the
 
 ## How it works
 
-1. A scheduled GitHub Actions workflow runs at 05:37 UTC, Monday to Friday.
-   Every run scans at least the past 24 hours; the Monday edition scans 72
-   hours, so the weekend is fully covered.
+1. A scheduled GitHub Actions workflow runs at 05:37 and 15:37 UTC, Monday
+   to Friday. The morning run opens the day's edition; the afternoon run
+   updates it with the stories published since. Every run scans at least the
+   past 24 hours; the Monday edition scans 72 hours, so the weekend is fully
+   covered.
 2. `scripts/build.mjs` fetches news published since the last run, filters out
    non-English results, deduplicates and classifies the rest, and renders one
    self-contained HTML page.
