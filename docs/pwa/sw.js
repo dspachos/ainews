@@ -4,7 +4,7 @@
    digest site is never intercepted. Bump VERSION when shell files change;
    old caches are deleted on activate. */
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const SHELL_CACHE = `ainews-shell-${VERSION}`;
 const DATA_CACHE = `ainews-data-${VERSION}`;
 const KEEP = [SHELL_CACHE, DATA_CACHE];
@@ -60,7 +60,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (url.pathname.endsWith('/data.json')) {
-    event.respondWith(staleWhileRevalidate(req));
+    event.respondWith(networkFirstData(req));
     return;
   }
   event.respondWith(cacheFirstShell(req));
@@ -79,22 +79,24 @@ async function networkFirstShell(req) {
   }
 }
 
-async function staleWhileRevalidate(req) {
-  const cache = await caches.open(DATA_CACHE);
-  const cached = await cache.match(req);
-  const fresh = fetch(req)
-    .then((res) => {
-      if (res.ok) cache.put(req, res.clone());
-      return res;
-    })
-    .catch(() => null);
-  if (cached) return cached;
-  const res = await fresh;
-  if (res) return res;
-  return new Response('{"error":"offline"}', {
-    status: 503,
-    headers: { 'Content-Type': 'application/json' },
-  });
+/* Network-first for the data index: an app open or a foreground re-check
+   always sees the newest editions, and the cache serves only when offline. */
+async function networkFirstData(req) {
+  try {
+    const res = await fetch(req);
+    if (res.ok) {
+      const cache = await caches.open(DATA_CACHE);
+      cache.put(req, res.clone());
+    }
+    return res;
+  } catch {
+    const cached = await caches.match(req);
+    if (cached) return cached;
+    return new Response('{"error":"offline"}', {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
 
 async function cacheFirstShell(req) {

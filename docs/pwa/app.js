@@ -59,7 +59,10 @@ async function fetchJSON(url) {
 
 async function initData() {
   if (state.editions.length) return;
-  const doc = await fetchJSON(PATHS.data);
+  applyData(await fetchJSON(PATHS.data));
+}
+
+function applyData(doc) {
   state.editions = doc.editions;
   state.byDate = new Map(doc.editions.map((e) => [e.date, e]));
   state.items = [];
@@ -67,6 +70,31 @@ async function initData() {
     e.items.forEach((it, idx) => state.items.push({ ...it, date: e.date, idx }));
   }
   store('ainews.updated', new Date().toISOString());
+  lastEditionCheck = Date.now();
+}
+
+/* Re-check for a new edition when the app returns to the foreground or the
+   network comes back, so an open app never needs a restart to show the
+   day's new items. Throttled because quick app switching fires many events. */
+let lastEditionCheck = 0;
+
+async function checkForNewEditions() {
+  if (!state.editions.length) return;
+  if (Date.now() - lastEditionCheck < 60 * 1000) return;
+  let doc;
+  try {
+    doc = await fetchJSON(PATHS.data);
+  } catch {
+    return; /* offline or a failed request: the current editions stay */
+  }
+  const newest = doc.editions?.[0]?.date;
+  if (!newest || newest === state.editions[0].date) return;
+  applyData(doc);
+  const r = route();
+  /* Leave the reader alone; list screens re-render with the new edition. */
+  if (modalEl || (r.screen !== 'today' && r.screen !== 'editions')) return;
+  underlyingKey = null;
+  render();
 }
 
 /* ---------- helpers ---------- */
@@ -742,6 +770,10 @@ function boot() {
   wireOffline();
   wireStoryLinks();
   window.addEventListener('hashchange', render);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkForNewEditions();
+  });
+  window.addEventListener('online', checkForNewEditions);
   render();
 }
 

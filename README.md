@@ -70,7 +70,9 @@ cp "docs/archive/ai-news-$(date -u +%F).html" docs/index.html
 `docs/pwa/` holds a no-build PWA (plain HTML/CSS/JS, hash routing). It reads
 `docs/data.json`, built by `scripts/build-index.mjs` from the `#news-data`
 payloads embedded in the archive pages. `data.json` is generated, never
-hand-edited. The service worker scopes to `/ainews/pwa/` only; bump `VERSION`
+hand-edited. The service worker serves `data.json` network-first, and the
+app re-checks it when it returns to the foreground, so new editions appear
+without a restart. The service worker scopes to `/ainews/pwa/` only; bump `VERSION`
 in `docs/pwa/sw.js` whenever a shell file changes, or users keep the old
 cached shell. Icons regenerate with `python3 scripts/make_pwa_icons.py`
 (needs Pillow).
