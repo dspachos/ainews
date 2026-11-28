@@ -67,6 +67,14 @@ cp "docs/archive/ai-news-$(date -u +%F).html" docs/index.html
 | `--out=DIR` | Write the HTML to another directory. |
 | `--max=N` | Cap the total story count (default 90). |
 
+### 1-Page A4 Newspaper PDF
+
+Generate an authentic broadsheet 1-page A4 PDF saved to `~/Downloads`:
+
+```bash
+node scripts/generate-newspaper.mjs [--hours=N] [--out=DIR] [--no-fetch]
+```
+
 ## The app
 
 `docs/pwa/` holds a no-build PWA (plain HTML/CSS/JS, hash routing). It reads
